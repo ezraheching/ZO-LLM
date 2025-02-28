@@ -1080,13 +1080,13 @@ class OurTrainer(Trainer):
         for name, param in self.named_parameters_to_optim:
             sign_z = torch.sign(noise_dict[name])  # ✅ Use only the sign of the noise
             # Compute the quantized learning rate ηq = max(⌊ η / s ⌋, 1) * s
-        #eta_q = max(int(self.args.learning_rate / s), 1) * s
-        eta_q = max(int(self._get_learning_rate() / s), 1) * s # may not work
-
-        # Apply quantized update manually
-        param.data = param.data - eta_q * np.sign(self.projected_grad) * sign_z  # ✅ Manual update
-        param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Final clamping
-        param.grad = None  # Avoid further updates
+            #eta_q = max(int(self.args.learning_rate / s), 1) * s
+            eta_q = max(int(self._get_learning_rate() / s), 1) * s # may not work
+    
+            # Apply quantized update manually
+            param.data = param.data - eta_q * np.sign(self.projected_grad) * sign_z  # ✅ Manual update
+            param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Final clamping
+            param.grad = None  # Avoid further updates
         assert self.args.gradient_accumulation_steps == 1
 
         return loss1

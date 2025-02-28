@@ -490,7 +490,7 @@ class OurTrainer(Trainer):
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
 
                 # MeZO added: estimate gradient
-                if args.trainer in ["zo_sgd", "zo_adam", "zo_sign_opt"]:
+                if args.trainer in ["zo_sgd", "zo_adam", "zo_sign_opt", "zo_sign_opt_quant"]:
                     if args.module_wise_perturbation:
                         assert args.q == 1, "module-wise perturbation only supports q=1"
                         if args.coordinate_perturbation:
@@ -498,7 +498,10 @@ class OurTrainer(Trainer):
                         else:
                             tr_loss_step = self.zo_step_with_module_wise_perturbation(model, inputs)
                     elif args.q == 1:
-                        tr_loss_step = self.zo_step(model, inputs)
+                        if args.trainer in ["zo_sign_opt_quant"]: ################ changed #################
+                            tr_loss_step = self.zo_step_quant(model, inputs)
+                        else
+                            tr_loss_step = self.zo_step(model, inputs)
                     elif args.q > 1:
                         tr_loss_step = self.zo_step_v1(model, inputs)
                     else:
@@ -543,6 +546,8 @@ class OurTrainer(Trainer):
                     # MeZO added: update model with the estimated gradient
                     if args.trainer in ["zo_sgd", "zo_adam", "zo_sign_opt", "zo_conserv"]:
                         self.zo_update(model)
+                    elif args.trainer in ["zo_sign_opt_quant"]:############ changed ############
+                        self.zo_update_quant(model)
                     elif args.trainer == "forward_grad":
                         self.forward_grad_update(model)
                     else:
@@ -1001,6 +1006,91 @@ class OurTrainer(Trainer):
 
         return torch.stack(all_losses).mean()
 
+    def quantize_noise(z, s, mu): ############## added ############
+        """
+        Quantizes noise z using step size s and discrete steps based on mu.
+        """
+        m = max(int(mu / s), 1)  # Compute the number of quantization levels
+        B = torch.linspace(-m * s, m * s, 2 * m + 1, device=z.device, dtype=z.dtype)  # Generate quantized levels
+    
+        # Find the closest quantization level
+        z_q = torch.bucketize(z, B) - (len(B) // 2)  # Convert to nearest quantized step
+        z_q = z_q * s  # Scale back
+
+        return z_q  # ✅ We do NOT clamp here
+
+    @torch.no_grad()
+    def zo_step_quant(self, model, inputs): ############# added #############
+        """
+        Zeroth-order optimization step with quantized noise.
+        """
+        args = self.args
+        
+        # What parameters to optimize
+        self.named_parameters_to_optim = []
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                self.named_parameters_to_optim.append((name, param))
+                # param.grad = torch.zeros_like(param.data)
+                param.grad = None  # Make sure the grad is empty and will not be updated.
+
+        # Sample the random seed for sampling z
+        self.zo_random_seed = np.random.randint(1000000000)
+        
+        torch.manual_seed(random_seed if random_seed is not None else self.zo_random_seed)
+        self.sparse_grad_rng.manual_seed(self.sparse_grad_random_seed)
+        
+        # Generate quantized noise for all parameters
+        noise_dict = {}
+        param_originals = {}  # Store original parameter values
+        for name, param in self.named_parameters_to_optim:
+            param_originals[name] = param.data.clone()  # Store original value
+    
+            # Generate noise
+            z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
+            s, Rmin, Rmax = self.get_lora_quantization_bounds(model)  # Get quantization parameters
+            z_q = self.quantize_noise(z, s, self.args.zo_eps)  # ✅ Quantized noise
+            noise_dict[name] = z_q
+            
+        # First function evaluation (Forward perturbation)
+        for name, param in self.named_parameters_to_optim:
+            param.data = param_originals[name] + self.args.zo_eps * noise_dict[name]  # Apply noise
+            param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the perturbed parameter
+        loss1 = self.zo_forward(model, inputs)
+        
+        # Second function evaluation (Backward perturbation)
+        if self.args.perturbation_mode == "one_side":  ##### mistake here but i don't care ###
+            for name, param in self.named_parameters_to_optim:
+                param.data = param_originals[name] - self.args.zo_eps * noise_dict[name]  # Reverse noise
+                param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the reversed parameter
+            loss2 = self.zo_forward(model, inputs)
+            self.projected_grad = ((loss1 - loss2) / self.args.zo_eps).item()
+        else:  # Two-side perturbation
+            for name, param in self.named_parameters_to_optim:
+                param.data = param_originals[name] - 2 * self.args.zo_eps * noise_dict[name]  # Apply second perturbation
+                param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the perturbed parameter
+            loss2 = self.zo_forward(model, inputs)
+            self.projected_grad = ((loss1 - loss2) / (2 * self.args.zo_eps)).item()
+            
+        # **Reset back to the exact original values**
+        for name, param in self.named_parameters_to_optim:
+            param.data = param_originals[name]  # ✅ Restore exact original parameter values
+            
+        # Compute gradients and apply updates
+        for name, param in self.named_parameters_to_optim:
+            sign_z = torch.sign(noise_dict[name])  # ✅ Use only the sign of the noise
+            # Compute the quantized learning rate ηq = max(⌊ η / s ⌋, 1) * s
+        #eta_q = max(int(self.args.learning_rate / s), 1) * s
+        eta_q = max(int(self._get_learning_rate() / s), 1) * s # may not work
+
+        # Apply quantized update manually
+        param.data = param.data - eta_q * np.sign(self.projected_grad) * sign_z  # ✅ Manual update
+        param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Final clamping
+        param.grad = None  # Avoid further updates
+        assert self.args.gradient_accumulation_steps == 1
+
+        return loss1
+  
     @torch.no_grad()
     def zo_step(self, model, inputs):
         """

@@ -1018,6 +1018,26 @@ class OurTrainer(Trainer):
         z_q = z_q * s  # Scale back
 
         return z_q  # ✅ We do NOT clamp here
+        
+    def get_lora_quantization_bounds(self, model): ################# added ##################
+        """
+        Extracts per-layer quantization scale and bounds from LoRA layers in the model.
+        Returns a dictionary mapping layer names to (s, Rmin, Rmax).
+        """
+        quant_params = {}  # Dictionary to store per-layer parameters
+    
+        for name, module in model.named_modules():
+            if isinstance(module, LoRALinear_quant):  
+                quant_params[name] = (
+                    module.quant_info["s"],
+                    module.quant_info["Rmin"],
+                    module.quant_info["Rmax"]
+                )
+    
+        if not quant_params:
+            raise ValueError("No LoRA layers found in the model!")
+
+        return quant_params  
 
     @torch.no_grad()
     def zo_step_quant(self, model, inputs): ############# added #############
@@ -1025,7 +1045,10 @@ class OurTrainer(Trainer):
         Zeroth-order optimization step with quantized noise.
         """
         args = self.args
-        
+
+        # Get per-layer quantization parameters
+        quant_params = self.get_lora_quantization_bounds(model)
+         
         # What parameters to optimize
         self.named_parameters_to_optim = []
         for name, param in model.named_parameters():
@@ -1045,15 +1068,21 @@ class OurTrainer(Trainer):
         param_originals = {}  # Store original parameter values
         for name, param in self.named_parameters_to_optim:
             param_originals[name] = param.data.clone()  # Store original value
-    
+
+            # ✅ Get per-layer quantization parameters
+            if name in quant_params:
+                s, Rmin, Rmax = quant_params[name]
+            else:
+                raise ValueError(f"Quantization parameters missing for layer {name}")
+
             # Generate noise
             z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
-            s, Rmin, Rmax = self.get_lora_quantization_bounds(model)  # Get quantization parameters
             z_q = self.quantize_noise(z, s, self.args.zo_eps)  # ✅ Quantized noise
             noise_dict[name] = z_q
             
         # First function evaluation (Forward perturbation)
         for name, param in self.named_parameters_to_optim:
+            s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
             param.data = param_originals[name] + self.args.zo_eps * noise_dict[name]  # Apply noise
             param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the perturbed parameter
         loss1 = self.zo_forward(model, inputs)
@@ -1061,12 +1090,14 @@ class OurTrainer(Trainer):
         # Second function evaluation (Backward perturbation)
         if self.args.perturbation_mode == "one_side":  ##### mistake here but i don't care ###
             for name, param in self.named_parameters_to_optim:
+                s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
                 param.data = param_originals[name] - self.args.zo_eps * noise_dict[name]  # Reverse noise
                 param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the reversed parameter
             loss2 = self.zo_forward(model, inputs)
             self.projected_grad = ((loss1 - loss2) / self.args.zo_eps).item()
         else:  # Two-side perturbation
             for name, param in self.named_parameters_to_optim:
+                s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
                 param.data = param_originals[name] - 2 * self.args.zo_eps * noise_dict[name]  # Apply second perturbation
                 param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the perturbed parameter
             loss2 = self.zo_forward(model, inputs)
@@ -1078,6 +1109,7 @@ class OurTrainer(Trainer):
             
         # Compute gradients and apply updates
         for name, param in self.named_parameters_to_optim:
+            s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
             sign_z = torch.sign(noise_dict[name])  # ✅ Use only the sign of the noise
             # Compute the quantized learning rate ηq = max(⌊ η / s ⌋, 1) * s
             #eta_q = max(int(self.args.learning_rate / s), 1) * s

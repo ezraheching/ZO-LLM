@@ -22,7 +22,63 @@ def find_module(root_module: nn.Module, key: str):
     module = getattr(parent_module, sub_keys[-1])
     return parent_module, sub_keys[-1], module
 
+class LoRALinear_quant(LoRALinear): ########### added ############
+    """
+    LoRA implemented in a dense layer
+    From https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    """
 
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            r: int = 0,
+            lora_alpha: int = 1,
+            lora_dropout: float = 0.,
+            fan_in_fan_out: bool = False,
+            # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+            merge_weights: bool = False,
+            bits: int = 8,  # Number of quantization bits
+            **kwargs
+    ):
+        # Call the parent LoRALinear constructor
+        super().__init__(
+            in_features, out_features, r, lora_alpha, lora_dropout,
+            fan_in_fan_out, merge_weights, **kwargs
+        )
+        
+        # Compute Rmax and Rmin using the midpoint
+        W_max = max(self.lora_A.max(), self.lora_B.max())  # Max value across both matrices
+        W_min = min(self.lora_A.min(), self.lora_B.min())  # Min value across both matrices
+
+        R_mid = (W_max + W_min) / 2
+        R_range = (W_max - W_min)
+    
+        self.Rmax = R_mid + R_range
+        self.Rmin = R_mid - R_range
+        # Compute quantization step size
+        self.s = (self.Rmax - self.Rmin) / (2 ** self.bits - 1)
+    
+        # Store per-layer quantization info
+        self.quant_info = {"Rmax": self.Rmax, "Rmin": self.Rmin, "s": self.s}
+    
+        # Apply quantization
+        self.lora_A.data = self.quantize(self.lora_A.data)
+        self.lora_B.data = self.quantize(self.lora_B.data)
+        
+    def quantize(self, w):
+        """Quantizes a weight tensor w based on the computed step size s."""
+        # Compute midpoint of the range
+        Rmid = (self.Rmax + self.Rmin) / 2
+    
+        # Shift values to center around Rmid before quantization
+        w_q = torch.round((w - Rmid) / self.s) * self.s + Rmid
+    
+        # Clamp to ensure values stay within valid range
+        w_q = torch.clamp(w_q, self.Rmin, self.Rmax)
+
+        return w_q
+        
 class LoRALinear(nn.Linear):
     """
     LoRA implemented in a dense layer

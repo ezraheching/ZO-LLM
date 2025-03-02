@@ -265,12 +265,12 @@ class LoRA:
                     
                     attn.q_proj = LoRALayerClass(
                         model.config.hidden_size, model.config.hidden_size,
-                        r=r, lora_alpha=alpha, bias=model.config.enable_bias
+                        r=r, lora_alpha=alpha, bias=False
                     ).to(original_q_weight.device)
                 
                     attn.v_proj = LoRALayerClass(
                         model.config.hidden_size, model.config.hidden_size,
-                        r=r, lora_alpha=alpha, bias=model.config.enable_bias
+                        r=r, lora_alpha=alpha, bias=False
                     ).to(original_v_weight.device)
                 
                     if float16:

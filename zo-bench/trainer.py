@@ -1072,8 +1072,11 @@ class OurTrainer(Trainer):
         for name, param in self.named_parameters_to_optim:
             param_originals[name] = param.data.clone()  # Store original value
 
+            # ✅ Normalize name by stripping .lora_A / .lora_B
+            base_name = name.replace(".lora_A", "").replace(".lora_B", "")
+
+            if base_name in quant_params: 
             # ✅ Get per-layer quantization parameters
-            if name in quant_params:
                 s, Rmin, Rmax = quant_params[name]
             else:
                 raise ValueError(f"Quantization parameters missing for layer {name}")

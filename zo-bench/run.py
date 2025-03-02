@@ -265,7 +265,7 @@ class Framework:
                          float16=self.args.load_float16, init_by_real_act=self.args.prefix_init_by_real_act)
         if self.args.lora: ############# changed ################
             from lora import LoRA
-            LoRA(model, r=self.args.lora_r, alpha=self.args.lora_alpha, float16=self.args.load_float16,quantized=(self.args.trainer == "zo_sign_opt_quant")
+            LoRA(model, r=self.args.lora_r, alpha=self.args.lora_alpha, float16=self.args.load_float16,quantized=(self.args.trainer == "zo_sign_opt_quant"))
 
         if self.args.prompt_tuning:
             from prompt_tuning import PromptTuning

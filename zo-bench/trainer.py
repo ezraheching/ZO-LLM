@@ -1061,7 +1061,7 @@ class OurTrainer(Trainer):
         # Sample the random seed for sampling z
         self.zo_random_seed = np.random.randint(1000000000)
         
-        torch.manual_seed(random_seed if random_seed is not None else self.zo_random_seed)
+        torch.manual_seed(self.zo_random_seed)
         self.sparse_grad_rng.manual_seed(self.sparse_grad_random_seed)
         
         # Generate quantized noise for all parameters

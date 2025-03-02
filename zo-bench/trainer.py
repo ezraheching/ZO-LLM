@@ -124,6 +124,7 @@ OPTIMIZER_NAME = "optimizer.pt"
 SCHEDULER_NAME = "scheduler.pt"
 SCALER_NAME = "scaler.pt"
 
+from lora import LoRALinear, LoRALinear_quant  # Ensure this import ########## added import ############
 
 class OurTrainer(Trainer):
 

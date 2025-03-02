@@ -258,10 +258,10 @@ class LoRA:
                     attn.v_proj.weight.data = original_v_weight
                     
                 elif model.config.model_type == "roberta":
-                    original_q_weight = attn.q_proj.weight.data
-                    original_q_bias = attn.q_proj.bias.data
-                    original_v_weight = attn.v_proj.weight.data
-                    original_v_bias = attn.v_proj.bias.data
+                    original_q_weight = attn.self.query.weight.data
+                    original_q_bias = attn.self.query.bias.data
+                    original_v_weight = attn.self.value.weight.data
+                    original_v_bias = attn.self.value.bias.data
                     
                     attn.q_proj = LoRALayerClass(
                         model.config.hidden_size, model.config.hidden_size,
@@ -277,10 +277,11 @@ class LoRA:
                         attn.q_proj.half()
                         attn.v_proj.half()
                 
-                    attn.q_proj.weight.data = original_q_weight
-                    attn.q_proj.bias.data = original_q_bias
-                    attn.v_proj.weight.data = original_v_weight
-                    attn.v_proj.bias.data = original_v_bias
+                    
+                    attn.self.query.weight.data = original_q_weight
+                    attn.self.query.bias.data = original_q_bias
+                    attn.self.value.weight.data = original_v_weight
+                    attn.self.value.bias.data = original_v_bias
 
                 else:
                     raise NotImplementedError

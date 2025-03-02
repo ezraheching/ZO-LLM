@@ -163,16 +163,18 @@ class LoRALinear(nn.Linear):
 
 class LoRA:
 
-    def __init__(self, model, r, alpha, float16):
+    def __init__(self, model, r, alpha, float16, quantized=False):
         """
         Input:
         r, alpha: LoRA hyperparameters
         float16: Whether the model parameters are float16 or not
+        quantized: Whether to use quantized LoRA layers (determined by trainer arg)
         """
 
         self.model = model
         self.hidden_dim = model.config.hidden_size
         self.float16 = float16
+        self.quantized = quantized  # ✅ Store the quantized flag
 
         if model.config.model_type == "opt":
             attention_name = "attn"
@@ -182,7 +184,10 @@ class LoRA:
             attention_name = "self_attn"
         else:
             raise NotImplementedError
-
+            
+        # ✅ Choose the right LoRA layer class based on `quantized`
+        LoRALayerClass = LoRALinear_quant if quantized else LoRALinear  
+        
         # Insert LoRA
         for key, _ in model.named_modules():
             if key[-len(attention_name):] == attention_name:
@@ -194,9 +199,9 @@ class LoRA:
                     original_q_bias = attn.q_proj.bias.data
                     original_v_weight = attn.v_proj.weight.data
                     original_v_bias = attn.v_proj.bias.data
-                    attn.q_proj = LoRALinear(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
+                    attn.q_proj = LoRALayerClass(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
                                              bias=model.config.enable_bias).to(original_q_weight.device)
-                    attn.v_proj = LoRALinear(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
+                    attn.v_proj = LoRALayerClass(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
                                              bias=model.config.enable_bias).to(original_v_weight.device)
                     if float16:
                         attn.q_proj.half()
@@ -212,12 +217,12 @@ class LoRA:
                     original_v_weight = attn.v_proj.weight.data
                     original_q_bias = attn.q_proj.bias.data if attention_bias else None
                     original_v_bias = attn.v_proj.bias.data if attention_bias else None
-                    attn.q_proj = LoRALinear(
+                    attn.q_proj = LoRALayerClass(
                         model.config.hidden_size,
                         model.config.hidden_size,
                         r=r, lora_alpha=alpha, bias=attention_bias
                     ).to(original_q_weight.device)
-                    attn.v_proj = LoRALinear(
+                    attn.v_proj = LoRALayerClass(
                         model.config.hidden_size,
                         model.config.hidden_size,
                         r=r, lora_alpha=alpha, bias=attention_bias
@@ -236,12 +241,12 @@ class LoRA:
                     original_q_weight = attn.q_proj.weight.data
                     original_v_weight = attn.v_proj.weight.data
                     head_dim = config.hidden_size // config.num_attention_heads
-                    attn.q_proj = LoRALinear(
+                    attn.q_proj = LoRALayerClass(
                         config.hidden_size,
                         config.hidden_size,
                         r=r, lora_alpha=alpha
                     ).to(original_q_weight.device)
-                    attn.v_proj = LoRALinear(
+                    attn.v_proj = LoRALayerClass(
                         config.hidden_size,
                         config.num_key_value_heads * head_dim,
                         r=r, lora_alpha=alpha
@@ -258,12 +263,12 @@ class LoRA:
                     original_v_weight = attn.v_proj.weight.data
                     original_v_bias = attn.v_proj.bias.data
                     
-                    attn.q_proj = LoRALinear(
+                    attn.q_proj = LoRALayerClass(
                         model.config.hidden_size, model.config.hidden_size,
                         r=r, lora_alpha=alpha, bias=model.config.enable_bias
                     ).to(original_q_weight.device)
                 
-                    attn.v_proj = LoRALinear(
+                    attn.v_proj = LoRALayerClass(
                         model.config.hidden_size, model.config.hidden_size,
                         r=r, lora_alpha=alpha, bias=model.config.enable_bias
                     ).to(original_v_weight.device)

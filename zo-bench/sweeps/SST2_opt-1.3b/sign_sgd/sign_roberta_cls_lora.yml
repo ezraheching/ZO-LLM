@@ -14,7 +14,7 @@ command:
 - "--evaluation_strategy=steps"
 - "--save_strategy=steps"
 - "--save_total_limit=1"
-- "--eval_steps=10" # from 1000
+- "--eval_steps=1000" # from 1000
 - "--max_steps=20000"
 - "--logging_steps=10"
 - "--num_eval=1000"
@@ -25,8 +25,8 @@ command:
 - "--trainer=zo_sign_opt"
 - "--train_set_seed=0"
 - "--lr_scheduler_type=constant"
-- "--eval_steps=10" # from 500
-- "--save_steps=10" # from 500
+- "--eval_steps=500" # from 500
+- "--save_steps=500" # from 500
 method: grid
 metric:
   goal: maximize

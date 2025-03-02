@@ -257,7 +257,7 @@ class LoRA:
                     attn.q_proj.weight.data = original_q_weight
                     attn.v_proj.weight.data = original_v_weight
                     
-                elif model.config.model_type == "robertajjgjhj":
+                elif model.config.model_type == "roberta":
                     original_q_weight = attn.self.query.weight.data
                     original_q_bias = attn.self.query.bias.data
                     original_v_weight = attn.self.value.weight.data

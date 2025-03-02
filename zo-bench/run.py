@@ -241,8 +241,8 @@ class Framework:
                     torch_dtype = torch.bfloat16
                 model = AutoModelForCausalLM.from_pretrained(self.args.model_name, config=config, 
                                                              device_map="balanced_low_0",  # Distributes model efficiently
-                                                             offload_folder="/tmp/offload"  # Explicit folder for CPU offloading
-                                                             #device_map='auto',
+                                                             offload_folder="/tmp/offload",  # Explicit folder for CPU offloading
+                                                             #device_map='auto',#######################################################
                                                              torch_dtype=torch_dtype,
                                                              max_memory={i: f'{free_in_GB - 5}GB' for i in
                                                                          range(torch.cuda.device_count())},

@@ -1026,9 +1026,11 @@ class OurTrainer(Trainer):
         Returns a dictionary mapping layer names to (s, Rmin, Rmax).
         """
         quant_params = {}  # Dictionary to store per-layer parameters
-    
+
+        print("Detected LoRA layers:")
         for name, module in model.named_modules():
             if isinstance(module, LoRALinear_quant):  
+                print(f" - {name}")  
                 quant_params[name] = (
                     module.quant_info["s"],
                     module.quant_info["Rmin"],

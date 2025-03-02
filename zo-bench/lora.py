@@ -284,6 +284,7 @@ class LoRA:
                     attn.self.value.bias.data = original_v_bias
 
                 else:
+                    print("exception NotImplementedError")
                     raise NotImplementedError
 
         # Freeze non-LoRA parameters

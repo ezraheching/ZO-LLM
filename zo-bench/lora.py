@@ -128,6 +128,7 @@ class LoRALinear_quant(LoRALinear): ########### added ############
             in_features, out_features, r, lora_alpha, lora_dropout,
             fan_in_fan_out, merge_weights, **kwargs
         )
+        self.bits=bits
         
         # Compute Rmax and Rmin using the midpoint
         W_max = max(self.lora_A.max(), self.lora_B.max())  # Max value across both matrices

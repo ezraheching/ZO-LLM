@@ -500,7 +500,7 @@ class OurTrainer(Trainer):
                     elif args.q == 1:
                         if args.trainer in ["zo_sign_opt_quant"]: ################ changed #################
                             tr_loss_step = self.zo_step_quant(model, inputs)
-                        else
+                        else:
                             tr_loss_step = self.zo_step(model, inputs)
                     elif args.q > 1:
                         tr_loss_step = self.zo_step_v1(model, inputs)

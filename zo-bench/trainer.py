@@ -1069,6 +1069,8 @@ class OurTrainer(Trainer):
         # Generate quantized noise for all parameters
         noise_dict = {}
         param_originals = {}  # Store original parameter values
+        device = param.data.device
+
         for name, param in self.named_parameters_to_optim:
             param_originals[name] = param.data.clone()  # Store original value
 

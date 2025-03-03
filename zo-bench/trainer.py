@@ -1069,10 +1069,11 @@ class OurTrainer(Trainer):
         # Generate quantized noise for all parameters
         noise_dict = {}
         param_originals = {}  # Store original parameter values
-        device = param.data.device
+
 
         for name, param in self.named_parameters_to_optim:
             param_originals[name] = param.data.clone()  # Store original value
+            device = param.data.device
 
             # ✅ Normalize name by stripping .lora_A / .lora_B
             base_name = name.replace(".lora_A", "").replace(".lora_B", "")
@@ -1085,8 +1086,6 @@ class OurTrainer(Trainer):
 
             # Generate noise
             z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
-            print(z)
-            print(s)
             print(self.args.zo_eps)
             z_q = self.quantize_noise(z, s, self.args.zo_eps)  # ✅ Quantized noise
             noise_dict[name] = z_q
@@ -1097,6 +1096,7 @@ class OurTrainer(Trainer):
             base_name = name.replace(".lora_A", "").replace(".lora_B", "")
             s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
             param.data = param_originals[name] + self.args.zo_eps * noise_dict[name]  # Apply noise
+            device = param.data.device
             param.data = torch.clamp(param.data, Rmin.to(device), Rmax.to(device))  # ✅ Clamp the perturbed parameter
         loss1 = self.zo_forward(model, inputs)
         
@@ -1107,6 +1107,7 @@ class OurTrainer(Trainer):
                 base_name = name.replace(".lora_A", "").replace(".lora_B", "")
                 s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
                 param.data = param_originals[name] - self.args.zo_eps * noise_dict[name]  # Reverse noise
+                device = param.data.device
                 param.data = torch.clamp(param.data, Rmin.to(device), Rmax.to(device))  # ✅ Clamp the reversed parameter
             loss2 = self.zo_forward(model, inputs)
             self.projected_grad = ((loss1 - loss2) / self.args.zo_eps).item()
@@ -1116,6 +1117,7 @@ class OurTrainer(Trainer):
                 base_name = name.replace(".lora_A", "").replace(".lora_B", "")
                 s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
                 param.data = param_originals[name] - 2 * self.args.zo_eps * noise_dict[name]  # Apply second perturbation
+                device = param.data.device
                 param.data = torch.clamp(param.data, Rmin.to(device), Rmax.to(device))  # ✅ Clamp the perturbed parameter
             loss2 = self.zo_forward(model, inputs)
             self.projected_grad = ((loss1 - loss2) / (2 * self.args.zo_eps)).item()
@@ -1136,6 +1138,7 @@ class OurTrainer(Trainer):
     
             # Apply quantized update manually
             param.data = param.data - eta_q * np.sign(self.projected_grad) * sign_z  # ✅ Manual update
+            device = param.data.device
             param.data = torch.clamp(param.data, Rmin.to(device), Rmax.to(device))  # ✅ Final clamping
             param.grad = None  # Avoid further updates
         assert self.args.gradient_accumulation_steps == 1

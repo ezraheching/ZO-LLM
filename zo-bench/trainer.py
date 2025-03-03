@@ -548,7 +548,7 @@ class OurTrainer(Trainer):
                     if args.trainer in ["zo_sgd", "zo_adam", "zo_sign_opt", "zo_conserv"]:
                         self.zo_update(model)
                     elif args.trainer in ["zo_sign_opt_quant"]:############ changed ############
-                        self.zo_update_quant(model)
+                        self.zo_update(model)
                     elif args.trainer == "forward_grad":
                         self.forward_grad_update(model)
                     else:

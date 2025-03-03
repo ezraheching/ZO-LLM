@@ -1091,7 +1091,9 @@ class OurTrainer(Trainer):
             
         # First function evaluation (Forward perturbation)
         for name, param in self.named_parameters_to_optim:
-            s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
+            # ✅ Normalize name by stripping .lora_A / .lora_B
+            base_name = name.replace(".lora_A", "").replace(".lora_B", "")
+            s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
             param.data = param_originals[name] + self.args.zo_eps * noise_dict[name]  # Apply noise
             param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the perturbed parameter
         loss1 = self.zo_forward(model, inputs)
@@ -1099,14 +1101,18 @@ class OurTrainer(Trainer):
         # Second function evaluation (Backward perturbation)
         if self.args.perturbation_mode == "one_side":  ##### mistake here but i don't care ###
             for name, param in self.named_parameters_to_optim:
-                s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
+                # ✅ Normalize name by stripping .lora_A / .lora_B
+                base_name = name.replace(".lora_A", "").replace(".lora_B", "")
+                s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
                 param.data = param_originals[name] - self.args.zo_eps * noise_dict[name]  # Reverse noise
                 param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the reversed parameter
             loss2 = self.zo_forward(model, inputs)
             self.projected_grad = ((loss1 - loss2) / self.args.zo_eps).item()
         else:  # Two-side perturbation
             for name, param in self.named_parameters_to_optim:
-                s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
+                # ✅ Normalize name by stripping .lora_A / .lora_B
+                base_name = name.replace(".lora_A", "").replace(".lora_B", "")
+                s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
                 param.data = param_originals[name] - 2 * self.args.zo_eps * noise_dict[name]  # Apply second perturbation
                 param.data = torch.clamp(param.data, Rmin, Rmax)  # ✅ Clamp the perturbed parameter
             loss2 = self.zo_forward(model, inputs)
@@ -1118,7 +1124,9 @@ class OurTrainer(Trainer):
             
         # Compute gradients and apply updates
         for name, param in self.named_parameters_to_optim:
-            s, Rmin, Rmax = quant_params[name]  # ✅ Use per-layer quantization params
+            # ✅ Normalize name by stripping .lora_A / .lora_B
+            base_name = name.replace(".lora_A", "").replace(".lora_B", "")
+            s, Rmin, Rmax = quant_params[base_name]  # ✅ Use per-layer quantization params
             sign_z = torch.sign(noise_dict[name])  # ✅ Use only the sign of the noise
             # Compute the quantized learning rate ηq = max(⌊ η / s ⌋, 1) * s
             #eta_q = max(int(self.args.learning_rate / s), 1) * s

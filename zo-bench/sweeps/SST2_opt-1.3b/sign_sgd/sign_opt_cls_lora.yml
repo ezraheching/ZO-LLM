@@ -22,7 +22,7 @@ command:
 - "--num_dev=500"
 - "--train_as_classification"
 - "--perturbation_mode=two_side"
-- "--trainer=zo_sign_opt_quant" #### added quant
+- "--trainer=zo_sign_opt"
 - "--train_set_seed=0"
 - "--lr_scheduler_type=constant"
 - "--eval_steps=500"

@@ -1083,7 +1083,7 @@ class OurTrainer(Trainer):
 
             # Generate noise
             z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
-            z_q = self.quantize_noise(z, s, self.args.zo_eps)  # ✅ Quantized noise
+            z_q = self.quantize_noise(z, s, 1e-3)#self.args.zo_eps)  # ✅ Quantized noise
             noise_dict[name] = z_q
             
         # First function evaluation (Forward perturbation)

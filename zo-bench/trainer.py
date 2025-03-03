@@ -1077,7 +1077,7 @@ class OurTrainer(Trainer):
 
             if base_name in quant_params: 
             # ✅ Get per-layer quantization parameters
-                s, Rmin, Rmax = quant_params[name]
+                s, Rmin, Rmax = quant_params[base_name]
             else:
                 raise ValueError(f"Quantization parameters missing for layer {name}")
 

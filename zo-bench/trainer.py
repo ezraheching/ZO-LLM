@@ -1007,7 +1007,7 @@ class OurTrainer(Trainer):
 
         return torch.stack(all_losses).mean()
 
-    def quantize_noise(z, s, mu): ############## added ############
+    def quantize_noise(self, z, s, mu): ############## added ############
         """
         Quantizes noise z using step size s and discrete steps based on mu.
         """
@@ -1086,7 +1086,7 @@ class OurTrainer(Trainer):
             print(z)
             print(s)
             print(self.args.zo_eps)
-            z_q = self.quantize_noise(z, s, 1e-3)#self.args.zo_eps)  # ✅ Quantized noise
+            z_q = self.quantize_noise(z, s, self.args.zo_eps)  # ✅ Quantized noise
             noise_dict[name] = z_q
             
         # First function evaluation (Forward perturbation)

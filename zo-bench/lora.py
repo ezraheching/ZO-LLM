@@ -211,6 +211,18 @@ class LoRA:
                     attn.q_proj.bias.data = original_q_bias
                     attn.v_proj.weight.data = original_v_weight
                     attn.v_proj.bias.data = original_v_bias
+                    # After replacing the original projection layers with LoRA layers,
+                    # add this logging statement to report the shapes of the base weight, lora_A, and lora_B.
+                    logger.info(
+                        f"LoRA injected into {key} ({model.config.model_type}):\n"
+                        f"  - Query base weight shape: {attn.q_proj.weight.shape}\n"
+                        f"  - Query lora_A shape: {attn.q_proj.lora_A.shape if hasattr(attn.q_proj, 'lora_A') else 'N/A'}\n"
+                        f"  - Query lora_B shape: {attn.q_proj.lora_B.shape if hasattr(attn.q_proj, 'lora_B') else 'N/A'}\n"
+                        f"  - Value base weight shape: {attn.v_proj.weight.shape}\n"
+                        f"  - Value lora_A shape: {attn.v_proj.lora_A.shape if hasattr(attn.v_proj, 'lora_A') else 'N/A'}\n"
+                        f"  - Value lora_B shape: {attn.v_proj.lora_B.shape if hasattr(attn.v_proj, 'lora_B') else 'N/A'}"
+                    )
+
                 elif model.config.model_type == "llama":
                     # in early version of transformers, llama attention bias is hard coded to False
                     attention_bias = False if not hasattr(model.config, "attention_bias") else model.config.attention_bias

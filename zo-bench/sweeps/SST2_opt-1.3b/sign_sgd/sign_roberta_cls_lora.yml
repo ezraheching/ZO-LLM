@@ -7,7 +7,7 @@ command:
 - "--lora"
 - "--model_name=FacebookAI/roberta-large"
 - "--task_name=SST2"
-- "--output_dir=/content/drive/MyDrive/zo_llm_checkpoints/SST2-lora-$TAG"
+- "--output_dir=result/SST2-lora-$TAG"
 - "--num_train_epochs=5"
 - "--per_device_train_batch_size=16"
 - "--load_best_model_at_end"

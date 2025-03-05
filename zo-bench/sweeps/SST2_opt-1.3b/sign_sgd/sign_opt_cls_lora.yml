@@ -34,15 +34,15 @@ metric:
 parameters:
   learning_rate:
     values:
-      - 1e-3
-      - 1e-4
-      - 1e-5
-      - 1e-6
+      #- 1e-3
+      #- 1e-4
+      - 5e-5
+      #- 1e-6
   zo_eps:
     values:
       - 1e-2
-      - 1e-3
-      - 1e-4
+      #- 1e-3
+      #- 1e-4
   weight_decay:
     values:
       - 0

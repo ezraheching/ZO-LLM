@@ -1089,8 +1089,8 @@ class OurTrainer(Trainer):
             z_q = self.quantize_noise(z, s, self.args.zo_eps)  # ✅ Quantized noise
             noise_dict[name] = z_q
             
-        print(f"quantized mu,zo_eps={name}",name=self.args.zo_eps)
-        print(f"quantized learning rate = {name}",name=self.args.learning_rate)
+        print(f"quantized mu,zo_eps={self.args.zo_eps}")
+        print(f"quantized learning rate = {self.args.learning_rate}")
         
         # First function evaluation (Forward perturbation)
         for name, param in self.named_parameters_to_optim:
@@ -1166,8 +1166,8 @@ class OurTrainer(Trainer):
         # Sample the random seed for sampling z
         self.zo_random_seed = np.random.randint(1000000000)
 
-        print(f" mu,zo_eps={name}",name=self.args.zo_eps)
-        print(f" learning rate = {name}",name=self.args.learning_rate)
+        print(f" mu,zo_eps={self.args.zo_eps}")
+        print(f" learning rate = {self.args.learning_rate}")
         
         # First function evaluation
         # NOTE: when sparse_grad is set to True, it will also check the args.gradient_sparsity,

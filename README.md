@@ -1,11 +1,18 @@
-# ✨ Zero-Order Quantized Optimization for Large Language Model Fine-Tuning: A Comparative Study ✨
+# ✨ Zero-Order Quantized Optimization for Large Language Model  ✨  
+# **Fine-Tuning: A Comparative Study**  
 
 ## 🔍 Overview
 This project extends **Zero-Order (ZO) Optimization** for **Large Language Model (LLM) fine-tuning** by integrating **quantized gradient updates**. Our work is based on **[ZO-LLM](https://github.com/ZO-Bench/ZO-LLM)**, with key modifications to enable **8-bit quantized zeroth-order optimization (ZOQO)**.
 
-**Key Contributions:**
-✅ **Implemented quantized ZO-SGD-Sign optimization for memory-efficient fine-tuning.**  
+**Key Contributions:**  
+✅ **Implemented quantized ZO-SGD-Sign optimization**  
+for memory-efficient fine-tuning.  
 ✅ **Compared non-quantized and quantized fine-tuning on SST-2 with OPT-1.3B.**  
+
+---
+
+## 🚀 Getting Started
+Follow the steps below to set up the environme  
 
 ---
 
@@ -15,9 +22,6 @@ Follow the steps below to set up the environment and run the experiments.
 ### 🔧 Google Colab Setup
 Run the following commands in **Google Colab** to configure the environment.
 
-
-
-run the following in google colab:
 ```
 from google.colab import drive
 drive.mount('/content/drive')
@@ -81,12 +85,12 @@ import condacolab
 !wandb login
 ```
 
-for non-quantized scheme:
+For Non-Quantized scheme:
 ```
 !conda run -n zollm wandb sweep /content/ZO-LLM/zo-bench/sweeps/SST2_opt-1.3b/sign_sgd/sign_opt_cls_lora.yml
 ```
 
-for quantized scheme:
+For Quantized scheme:
 ```
 !conda run -n zollm wandb sweep /content/ZO-LLM/zo-bench/sweeps/SST2_opt-1.3b/sign_sgd/sign_opt_cls_lora_quant.yml
 ```
@@ -97,7 +101,7 @@ for quantized scheme:
 
 ```
 !conda run -n zollm wandb agent ### insert here sweep agent run given above from #wandb
-# for example: ezraheching-tel-aviv-university/zo_bench/a7op5t8o
+# For example: ezraheching-tel-aviv-university/zo_bench/a7op5t8o
 ```
 
 

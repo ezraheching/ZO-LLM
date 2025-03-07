@@ -1,3 +1,88 @@
+### Our additions:
+run the following in google colab:
+```
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+```
+import os
+
+CHECKPOINT_DIR = "/content/drive/MyDrive/zo_llm_checkpoints"
+os.makedirs(CHECKPOINT_DIR, exist_ok=True)  # Create the directory if it doesn't exist
+
+print(f"Checkpoints will be saved in: {CHECKPOINT_DIR}")
+```
+
+```
+%cd /content
+```
+
+```
+!rm -rf ZO-LLM
+```
+
+```
+!git clone --branch quantize-sign_sgd_opt https://github.com/ezraheching/ZO-LLM.git
+```
+
+```
+%cd /content/ZO-LLM
+```
+
+```
+!pip install -q condacolab
+```
+
+```
+import condacolab
+```
+
+```
+%cd /content/ZO-LLM
+!conda create -n zollm python=3.10
+```
+
+```
+!source /usr/local/etc/profile.d/conda.sh && conda activate zollm
+```
+
+```
+!source /usr/local/etc/profile.d/conda.sh && conda init bash
+```
+
+```
+!conda run -n zollm pip install -r /content/ZO-LLM/requirements.txt
+```
+
+```
+%cd /content/ZO-LLM/zo-bench
+```
+
+```
+!wandb login
+```
+
+for non-quantized scheme:
+```
+!conda run -n zollm wandb sweep /content/ZO-LLM/zo-bench/sweeps/SST2_opt-1.3b/sign_sgd/sign_opt_cls_lora.yml
+```
+
+for quantized scheme:
+```
+!conda run -n zollm wandb sweep /content/ZO-LLM/zo-bench/sweeps/SST2_opt-1.3b/sign_sgd/sign_opt_cls_lora_quant.yml
+```
+
+```
+!conda run -n zollm pip install --upgrade datasets huggingface_hub
+```
+
+```
+!conda run -n zollm wandb agent ### insert here sweep agent run given above from #wandb
+# for example: ezraheching-tel-aviv-university/zo_bench/a7op5t8o
+```
+
+
 🌄 Revisiting Zeroth-Order Optimization for Memory-Efficient LLM Fine-Tuning: A Benchmark
 ====================================================
 

@@ -1,25 +1,18 @@
-# ✨ Zero-Order Quantized Optimization for Large Language Model  ✨  
-# **Fine-Tuning: A Comparative Study**  
+# ✨ Zero-Order Quantized Optimization for Large Language Model Fine-Tuning: A Comparative Study   
 
 ## 🔍 Overview
 This project extends **Zero-Order (ZO) Optimization** for **Large Language Model (LLM) fine-tuning** by integrating **quantized gradient updates**. Our work is based on **[ZO-LLM](https://github.com/ZO-Bench/ZO-LLM)**, with key modifications to enable **8-bit quantized zeroth-order optimization (ZOQO)**.
 
 **Key Contributions:**  
-✅ **Implemented quantized ZO-SGD-Sign optimization**  
-for memory-efficient fine-tuning.  
+✅ **Implemented quantized ZO-SGD-Sign optimization for memory-efficient fine-tuning.**  
 ✅ **Compared non-quantized and quantized fine-tuning on SST-2 with OPT-1.3B.**  
-
----
-
-## 🚀 Getting Started
-Follow the steps below to set up the environme  
 
 ---
 
 ## 🚀 Getting Started
 Follow the steps below to set up the environment and run the experiments.
 
-### 🔧 Google Colab Setup
+### Google Colab Setup
 Run the following commands in **Google Colab** to configure the environment.
 
 ```

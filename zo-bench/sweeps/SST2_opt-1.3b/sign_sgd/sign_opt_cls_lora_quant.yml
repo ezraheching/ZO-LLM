@@ -22,10 +22,10 @@ command:
 - "--num_dev=500"
 - "--train_as_classification"
 - "--perturbation_mode=two_side"
-- "--trainer=zo_sign_opt"
+- "--trainer=zo_sign_opt_quant" #### added quant
 - "--train_set_seed=0"
 - "--lr_scheduler_type=constant"
-- "--eval_steps=10"
+- "--eval_steps=50"
 - "--save_steps=500"
 method: grid
 metric:
@@ -36,7 +36,7 @@ parameters:
     values:
       - 1e-3
       - 1e-4
-      - 5e-5
+      - 1e-5
       - 1e-6
   zo_eps:
     values:

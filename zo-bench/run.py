@@ -239,7 +239,8 @@ class Framework:
                     torch_dtype = torch.float16
                 elif self.args.load_bfloat16:
                     torch_dtype = torch.bfloat16
-                model = AutoModelForCausalLM.from_pretrained(self.args.model_name, config=config, device_map='auto',
+                model = AutoModelForCausalLM.from_pretrained(self.args.model_name, config=config, 
+                                                             device_map='auto',
                                                              torch_dtype=torch_dtype,
                                                              max_memory={i: f'{free_in_GB - 5}GB' for i in
                                                                          range(torch.cuda.device_count())},
@@ -263,9 +264,9 @@ class Framework:
             from prefix_tuning import PrefixTuning
             PrefixTuning(model, num_prefix=self.args.num_prefix, reparam=not self.args.no_reparam,
                          float16=self.args.load_float16, init_by_real_act=self.args.prefix_init_by_real_act)
-        if self.args.lora:
+        if self.args.lora: ############# changed ################
             from lora import LoRA
-            LoRA(model, r=self.args.lora_r, alpha=self.args.lora_alpha, float16=self.args.load_float16)
+            LoRA(model, r=self.args.lora_r, alpha=self.args.lora_alpha, float16=self.args.load_float16,quantized=(self.args.trainer == "zo_sign_opt_quant"))
 
         if self.args.prompt_tuning:
             from prompt_tuning import PromptTuning

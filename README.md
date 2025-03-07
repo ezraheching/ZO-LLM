@@ -1,3 +1,103 @@
+# ✨ Zero-Order Quantized Optimization for Large Language Model Fine-Tuning: A Comparative Study   
+
+## 🔍 Overview
+This project extends **Zero-Order (ZO) Optimization** for **Large Language Model (LLM) fine-tuning** by integrating **quantized gradient updates**. Our work is based on **[ZO-LLM](https://github.com/ZO-Bench/ZO-LLM)**, with key modifications to enable **8-bit quantized zeroth-order optimization (ZOQO)**.
+
+**Key Contributions:**  
+✅ **Implemented quantized ZO-SGD-Sign optimization for memory-efficient fine-tuning.**  
+✅ **Compared non-quantized and quantized fine-tuning on SST-2 with OPT-1.3B.**  
+
+---
+
+## 🚀 Getting Started
+Follow the steps below to set up the environment and run the experiments.
+
+### Google Colab Setup
+Run the following commands in **Google Colab** to configure the environment.
+
+```
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+```
+import os
+
+CHECKPOINT_DIR = "/content/drive/MyDrive/zo_llm_checkpoints"
+os.makedirs(CHECKPOINT_DIR, exist_ok=True)  # Create the directory if it doesn't exist
+
+print(f"Checkpoints will be saved in: {CHECKPOINT_DIR}")
+```
+
+```
+%cd /content
+```
+
+```
+!rm -rf ZO-LLM
+```
+
+```
+!git clone --branch quantize-sign_sgd_opt https://github.com/ezraheching/ZO-LLM.git
+```
+
+```
+%cd /content/ZO-LLM
+```
+
+```
+!pip install -q condacolab
+```
+
+```
+import condacolab
+```
+
+```
+%cd /content/ZO-LLM
+!conda create -n zollm python=3.10
+```
+
+```
+!source /usr/local/etc/profile.d/conda.sh && conda activate zollm
+```
+
+```
+!source /usr/local/etc/profile.d/conda.sh && conda init bash
+```
+
+```
+!conda run -n zollm pip install -r /content/ZO-LLM/requirements.txt
+```
+
+```
+%cd /content/ZO-LLM/zo-bench
+```
+
+```
+!wandb login
+```
+
+For Non-Quantized scheme:
+```
+!conda run -n zollm wandb sweep /content/ZO-LLM/zo-bench/sweeps/SST2_opt-1.3b/sign_sgd/sign_opt_cls_lora.yml
+```
+
+For Quantized scheme:
+```
+!conda run -n zollm wandb sweep /content/ZO-LLM/zo-bench/sweeps/SST2_opt-1.3b/sign_sgd/sign_opt_cls_lora_quant.yml
+```
+
+```
+!conda run -n zollm pip install --upgrade datasets huggingface_hub
+```
+
+```
+!conda run -n zollm wandb agent ### insert here sweep agent run given above from #wandb
+# For example: ezraheching-tel-aviv-university/zo_bench/a7op5t8o
+```
+
+
 🌄 Revisiting Zeroth-Order Optimization for Memory-Efficient LLM Fine-Tuning: A Benchmark
 ====================================================
 

@@ -104,19 +104,78 @@ class LoRALinear(nn.Linear):
         else:
             return F.linear(x, T(self.weight), bias=self.bias)
 
+class LoRALinear_quant(LoRALinear): ########### added ############
+    """
+    LoRA implemented in a dense layer
+    From https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+    """
 
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            r: int = 0,
+            lora_alpha: int = 1,
+            lora_dropout: float = 0.,
+            fan_in_fan_out: bool = False,
+            # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
+            merge_weights: bool = False,
+            bits: int = 8,  # Number of quantization bits
+            **kwargs
+    ):
+        # Call the parent LoRALinear constructor
+        super().__init__(
+            in_features, out_features, r, lora_alpha, lora_dropout,
+            fan_in_fan_out, merge_weights, **kwargs
+        )
+        self.bits=bits
+        
+        # Compute Rmax and Rmin using the midpoint
+        W_max = max(self.lora_A.max(), self.lora_B.max())  # Max value across both matrices
+        W_min = min(self.lora_A.min(), self.lora_B.min())  # Min value across both matrices
+
+        R_mid = (W_max + W_min) / 2
+        R_range = (W_max - W_min)
+    
+        self.Rmax = R_mid + R_range
+        self.Rmin = R_mid - R_range
+        # Compute quantization step size
+        self.s = (self.Rmax - self.Rmin) / (2 ** self.bits - 1)
+    
+        # Store per-layer quantization info
+        self.quant_info = {"Rmax": self.Rmax, "Rmin": self.Rmin, "s": self.s}
+    
+        # Apply quantization
+        self.lora_A.data = self.quantize(self.lora_A.data)
+        self.lora_B.data = self.quantize(self.lora_B.data)
+        
+    def quantize(self, w):
+        """Quantizes a weight tensor w based on the computed step size s."""
+        # Compute midpoint of the range
+        Rmid = (self.Rmax + self.Rmin) / 2
+    
+        # Shift values to center around Rmid before quantization
+        w_q = torch.round((w - Rmid) / self.s) * self.s + Rmid
+    
+        # Clamp to ensure values stay within valid range
+        w_q = torch.clamp(w_q, self.Rmin, self.Rmax)
+
+        return w_q
+        
 class LoRA:
 
-    def __init__(self, model, r, alpha, float16):
+    def __init__(self, model, r, alpha, float16, quantized=False):
         """
         Input:
         r, alpha: LoRA hyperparameters
         float16: Whether the model parameters are float16 or not
+        quantized: Whether to use quantized LoRA layers (determined by trainer arg)
         """
 
         self.model = model
         self.hidden_dim = model.config.hidden_size
         self.float16 = float16
+        self.quantized = quantized  # ✅ Store the quantized flag
 
         if model.config.model_type == "opt":
             attention_name = "attn"
@@ -126,7 +185,10 @@ class LoRA:
             attention_name = "self_attn"
         else:
             raise NotImplementedError
-
+            
+        # ✅ Choose the right LoRA layer class based on `quantized`
+        LoRALayerClass = LoRALinear_quant if quantized else LoRALinear  
+        
         # Insert LoRA
         for key, _ in model.named_modules():
             if key[-len(attention_name):] == attention_name:
@@ -138,9 +200,9 @@ class LoRA:
                     original_q_bias = attn.q_proj.bias.data
                     original_v_weight = attn.v_proj.weight.data
                     original_v_bias = attn.v_proj.bias.data
-                    attn.q_proj = LoRALinear(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
+                    attn.q_proj = LoRALayerClass(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
                                              bias=model.config.enable_bias).to(original_q_weight.device)
-                    attn.v_proj = LoRALinear(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
+                    attn.v_proj = LoRALayerClass(model.config.hidden_size, model.config.hidden_size, r=r, lora_alpha=alpha,
                                              bias=model.config.enable_bias).to(original_v_weight.device)
                     if float16:
                         attn.q_proj.half()
@@ -149,6 +211,18 @@ class LoRA:
                     attn.q_proj.bias.data = original_q_bias
                     attn.v_proj.weight.data = original_v_weight
                     attn.v_proj.bias.data = original_v_bias
+                    # After replacing the original projection layers with LoRA layers,
+                    # add this logging statement to report the shapes of the base weight, lora_A, and lora_B.
+                    logger.info(
+                        f"LoRA injected into {key} ({model.config.model_type}):\n"
+                        f"  - Query base weight shape: {attn.q_proj.weight.shape}\n"
+                        f"  - Query lora_A shape: {attn.q_proj.lora_A.shape if hasattr(attn.q_proj, 'lora_A') else 'N/A'}\n"
+                        f"  - Query lora_B shape: {attn.q_proj.lora_B.shape if hasattr(attn.q_proj, 'lora_B') else 'N/A'}\n"
+                        f"  - Value base weight shape: {attn.v_proj.weight.shape}\n"
+                        f"  - Value lora_A shape: {attn.v_proj.lora_A.shape if hasattr(attn.v_proj, 'lora_A') else 'N/A'}\n"
+                        f"  - Value lora_B shape: {attn.v_proj.lora_B.shape if hasattr(attn.v_proj, 'lora_B') else 'N/A'}"
+                    )
+
                 elif model.config.model_type == "llama":
                     # in early version of transformers, llama attention bias is hard coded to False
                     attention_bias = False if not hasattr(model.config, "attention_bias") else model.config.attention_bias
@@ -156,12 +230,12 @@ class LoRA:
                     original_v_weight = attn.v_proj.weight.data
                     original_q_bias = attn.q_proj.bias.data if attention_bias else None
                     original_v_bias = attn.v_proj.bias.data if attention_bias else None
-                    attn.q_proj = LoRALinear(
+                    attn.q_proj = LoRALayerClass(
                         model.config.hidden_size,
                         model.config.hidden_size,
                         r=r, lora_alpha=alpha, bias=attention_bias
                     ).to(original_q_weight.device)
-                    attn.v_proj = LoRALinear(
+                    attn.v_proj = LoRALayerClass(
                         model.config.hidden_size,
                         model.config.hidden_size,
                         r=r, lora_alpha=alpha, bias=attention_bias
@@ -180,12 +254,12 @@ class LoRA:
                     original_q_weight = attn.q_proj.weight.data
                     original_v_weight = attn.v_proj.weight.data
                     head_dim = config.hidden_size // config.num_attention_heads
-                    attn.q_proj = LoRALinear(
+                    attn.q_proj = LoRALayerClass(
                         config.hidden_size,
                         config.hidden_size,
                         r=r, lora_alpha=alpha
                     ).to(original_q_weight.device)
-                    attn.v_proj = LoRALinear(
+                    attn.v_proj = LoRALayerClass(
                         config.hidden_size,
                         config.num_key_value_heads * head_dim,
                         r=r, lora_alpha=alpha
@@ -195,7 +269,46 @@ class LoRA:
                         attn.v_proj.half()
                     attn.q_proj.weight.data = original_q_weight
                     attn.v_proj.weight.data = original_v_weight
+                    
+                elif model.config.model_type == "roberta": #not in original paper code! added here
+                    original_q_weight = attn.self.query.weight.data
+                    original_q_bias = attn.self.query.bias.data
+                    original_v_weight = attn.self.value.weight.data
+                    original_v_bias = attn.self.value.bias.data
+                    
+                    attn.q_proj = LoRALayerClass(
+                        model.config.hidden_size, model.config.hidden_size,
+                        r=r, lora_alpha=alpha, bias=False
+                    ).to(original_q_weight.device)
+                
+                    attn.v_proj = LoRALayerClass(
+                        model.config.hidden_size, model.config.hidden_size,
+                        r=r, lora_alpha=alpha, bias=False
+                    ).to(original_v_weight.device)
+                
+                    if float16:
+                        attn.q_proj.half()
+                        attn.v_proj.half()
+                
+                    
+                    attn.self.query.weight.data = original_q_weight
+                    attn.self.query.bias.data = original_q_bias
+                    attn.self.value.weight.data = original_v_weight
+                    attn.self.value.bias.data = original_v_bias
+                    # After replacing the original projection layers with LoRA layers,
+                    # add this logging statement to report the shapes of the base weight, lora_A, and lora_B.
+                    logger.info(
+                        f"LoRA injected into {key} ({model.config.model_type}):\n"
+                        f"  - Query base weight shape: {attn.q_proj.weight.shape}\n"
+                        f"  - Query lora_A shape: {attn.q_proj.lora_A.shape if hasattr(attn.q_proj, 'lora_A') else 'N/A'}\n"
+                        f"  - Query lora_B shape: {attn.q_proj.lora_B.shape if hasattr(attn.q_proj, 'lora_B') else 'N/A'}\n"
+                        f"  - Value base weight shape: {attn.v_proj.weight.shape}\n"
+                        f"  - Value lora_A shape: {attn.v_proj.lora_A.shape if hasattr(attn.v_proj, 'lora_A') else 'N/A'}\n"
+                        f"  - Value lora_B shape: {attn.v_proj.lora_B.shape if hasattr(attn.v_proj, 'lora_B') else 'N/A'}"
+                    )
+
                 else:
+                    print("exception NotImplementedError")
                     raise NotImplementedError
 
         # Freeze non-LoRA parameters
